@@ -282,7 +282,7 @@ func runDriveCreateUpload(ctx context.Context, svc *drive.Service, file io.Reade
 	call := svc.Files.Create(meta).
 		SupportsAllDrives(true).
 		Media(file, gapi.ContentType(opts.mimeType)).
-		Fields("id, name, mimeType, size, webViewLink").
+		Fields("id, name, mimeType, size, webViewLink, webContentLink").
 		Context(ctx)
 	if opts.keepRevisionForever {
 		call = call.KeepRevisionForever(true)
@@ -316,7 +316,7 @@ func runDriveReplaceUpload(ctx context.Context, svc *drive.Service, file io.Read
 	call := svc.Files.Update(opts.replaceFileID, meta).
 		SupportsAllDrives(true).
 		Media(file, gapi.ContentType(opts.mimeType)).
-		Fields("id, name, mimeType, size, webViewLink").
+		Fields("id, name, mimeType, size, webViewLink, webContentLink").
 		Context(ctx)
 	if opts.keepRevisionForever {
 		call = call.KeepRevisionForever(true)
@@ -347,6 +347,9 @@ func writeDriveUploadResult(ctx context.Context, file *drive.File, replaced bool
 	}
 	if file.WebViewLink != "" {
 		u.Out().Linef("link\t%s", file.WebViewLink)
+	}
+	if file.WebContentLink != "" {
+		u.Out().Printf("downloadLink\t%s", file.WebContentLink)
 	}
 	return nil
 }
