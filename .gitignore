@@ -43,3 +43,4 @@ internal/cmd/safety_profile_baked_gen.go
 # Node (optional dev scripts)
 node_modules/
 dist/
+gog-linux-amd64
