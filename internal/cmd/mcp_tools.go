@@ -18,6 +18,7 @@ func mcpAllTools() []mcpToolSpec {
 		mcpGmailGetThreadTool(),
 		mcpDriveSearchTool(),
 		mcpDriveGetTool(),
+		mcpDriveUploadTool(),
 		mcpDocsGetTool(),
 		mcpSheetsReadRangeTool(),
 		mcpCalendarEventsTool(),
@@ -152,6 +153,47 @@ func mcpDriveGetTool() mcpToolSpec {
 				args = append(args, "--fields", fields)
 			}
 			return append(args, "--", fileID), nil
+		},
+	}
+}
+
+func mcpDriveUploadTool() mcpToolSpec {
+	return mcpToolSpec{
+		Name:        "drive_upload",
+		Service:     "drive",
+		Risk:        mcpRiskWrite,
+		Description: "Upload a local file to Drive, optionally replacing an existing Drive file ID. Requires --allow-write on the MCP server.",
+		Options: []mcp.ToolOption{
+			mcp.WithString("file_path", mcp.Description("Absolute local file path to upload"), mcp.Required()),
+			mcp.WithString("parent_id", mcp.Description("Destination folder ID for new uploads")),
+			mcp.WithString("replace_file_id", mcp.Description("Existing Drive file ID to replace in place, preserving link and permissions")),
+			mcp.WithString("name", mcp.Description("Optional filename override for create or replace")),
+			mcp.WithString("mime_type", mcp.Description("Optional MIME type override")),
+		},
+		BuildArgs: func(req mcp.CallToolRequest) ([]string, error) {
+			filePath, err := requireMCPString(req, "file_path")
+			if err != nil {
+				return nil, err
+			}
+			args := []string{"drive", "upload"}
+			parentID := strings.TrimSpace(req.GetString("parent_id", ""))
+			replaceFileID := strings.TrimSpace(req.GetString("replace_file_id", ""))
+			if parentID != "" && replaceFileID != "" {
+				return nil, fmt.Errorf("parent_id and replace_file_id are mutually exclusive")
+			}
+			if parentID != "" {
+				args = append(args, "--parent", parentID)
+			}
+			if replaceFileID != "" {
+				args = append(args, "--replace", replaceFileID)
+			}
+			if name := strings.TrimSpace(req.GetString("name", "")); name != "" {
+				args = append(args, "--name", name)
+			}
+			if mimeType := strings.TrimSpace(req.GetString("mime_type", "")); mimeType != "" {
+				args = append(args, "--mime-type", mimeType)
+			}
+			return append(args, "--", filePath), nil
 		},
 	}
 }

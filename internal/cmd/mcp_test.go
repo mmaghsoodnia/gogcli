@@ -24,6 +24,9 @@ func TestMCPEnabledToolsDefaultReadOnly(t *testing.T) {
 	if hasMCPTool(tools, "docs_write") {
 		t.Fatal("docs_write should require --allow-write")
 	}
+	if hasMCPTool(tools, "drive_upload") {
+		t.Fatal("drive_upload should require --allow-write")
+	}
 	if !hasMCPTool(tools, "gmail_search") {
 		t.Fatal("gmail_search should be enabled by default")
 	}
@@ -51,6 +54,38 @@ func TestMCPListToolsUsesRuntimeStdout(t *testing.T) {
 	}
 	if got := output.String(); !strings.Contains(got, `"tools"`) || !strings.Contains(got, `"gmail_search"`) {
 		t.Fatalf("unexpected tool list: %s", got)
+	}
+}
+
+func TestMCPDriveUploadReplaceBuildArgs(t *testing.T) {
+	tool := findMCPTool(t, "drive_upload")
+	args, err := tool.BuildArgs(mcp.CallToolRequest{Params: mcp.CallToolParams{
+		Arguments: map[string]any{
+			"file_path":       "/tmp/mhivereadme.md",
+			"replace_file_id": "file123",
+			"mime_type":       "text/markdown",
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"drive", "upload", "--replace", "file123", "--mime-type", "text/markdown", "--", "/tmp/mhivereadme.md"}
+	if strings.Join(args, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("args = %#v, want %#v", args, want)
+	}
+}
+
+func TestMCPDriveUploadRejectsParentWithReplace(t *testing.T) {
+	tool := findMCPTool(t, "drive_upload")
+	_, err := tool.BuildArgs(mcp.CallToolRequest{Params: mcp.CallToolParams{
+		Arguments: map[string]any{
+			"file_path":       "/tmp/mhivereadme.md",
+			"parent_id":       "folder123",
+			"replace_file_id": "file123",
+		},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Fatalf("expected mutually exclusive error, got %v", err)
 	}
 }
 

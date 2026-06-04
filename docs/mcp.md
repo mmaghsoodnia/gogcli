@@ -124,6 +124,7 @@ Write tools, hidden unless `--allow-write`:
 
 | Tool | Purpose |
 | --- | --- |
+| `drive_upload` | Upload a local file to Drive, optionally replacing an existing file ID in place. |
 | `docs_write` | Append or replace Google Docs text, optionally as Markdown. |
 | `sheets_update_range` | Update values in a Sheets range from a literal JSON 2D array. |
 
