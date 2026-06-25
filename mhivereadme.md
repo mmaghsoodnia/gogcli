@@ -71,6 +71,22 @@ gog --readonly --account user@example.com gmail search 'newer_than:7d' --json --
 For Google content reads, prefer `--json --wrap-untrusted`; for Gmail body
 inspection, prefer `--sanitize-content`.
 
+## Operational Google Workspace MCP
+
+For agent Google Workspace access, use the shared VPS MCP service:
+
+```json
+{
+  "type": "http",
+  "url": "http://srv1389008:8080/mcp"
+}
+```
+
+Do not use a local gog MCP launcher for normal agent work in this project. The
+VPS service owns the Google credentials, 1Password-backed keyring unlock, and
+default account (`mhive@bigbraincap.com`). Local `gog` binaries in this checkout
+are for CLI development and tests, not for the configured agent MCP transport.
+
 ## Auth And Secrets
 
 Never commit OAuth client credential JSON files, refresh tokens, access tokens,
@@ -115,7 +131,17 @@ merging to `main`, deleting the temporary branch, and ending on `main`.
 Preserve contributor credit with `Co-authored-by:` trailers and a PR comment
 with what landed and SHAs.
 
+## Git workflow & branch map
+
+This is a **fork** of `openclaw/gogcli`; we mostly consume upstream and keep a thin local layer. Follow the Git workflow in the global `mhivereadme.md` (mhive Drive root).
+
+- **Remotes:** `origin` → `mmaghsoodnia/gogcli` (your fork — push here); `upstream` → `openclaw/gogcli` (pull only, never push).
+- **`main`:** mirrors `upstream/main` plus only this docs layer (`mhivereadme.md`, `TODO.md`, `AGENTS.md`). Sync with `git fetch upstream && git switch main && git rebase upstream/main && git push origin main`.
+- **Off-`main` branches** — run `git branch -a` before assuming something is missing:
+  - `mm/drive-upload-replace` — `drive_upload` `replace_file_id` support; a clean commit on current upstream, PR-ready.
+  - `mm/old-fork-main` — salvaged legacy fork commits (`--show-anchors`, `webContentLink` on drive upload, the linux-build gitignore, an earlier mhivereadme).
+- **All feature/experiment work goes on `mm/*` branches — never commit it to `main`.**
+
 ## Per-agent Instruction Files
 
 - `AGENTS.md`: Codex-specific repository rules and pointer to this file.
-
