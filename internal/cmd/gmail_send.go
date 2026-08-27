@@ -26,6 +26,7 @@ type GmailSendCmd struct {
 	ThreadID         string   `name:"thread-id" help:"Reply within a Gmail thread (uses latest message for headers)"`
 	ReplyAll         bool     `name:"reply-all" help:"Auto-populate recipients from original message (requires --reply-to-message-id or --thread-id)"`
 	ReplyTo          string   `name:"reply-to" help:"Reply-To header address"`
+	CorrelationID    string   `name:"correlation-id" help:"Opaque X-Sportnet-Correlation-ID; requires an explicit --account and --reply-to"`
 	Attach           []string `name:"attach" help:"Attachment file path (repeatable)"`
 	From             string   `name:"from" help:"Send from this email address (must be a verified send-as alias)"`
 	Signature        bool     `name:"signature" help:"Append the Gmail signature from the active send-as address"`
@@ -44,10 +45,13 @@ type sendBatch struct {
 }
 
 type sendResult struct {
-	To         string
-	MessageID  string
-	ThreadID   string
-	TrackingID string
+	To            string
+	MessageID     string
+	ThreadID      string
+	RFCMessageID  string
+	CorrelationID string
+	ReplyTo       string
+	TrackingID    string
 }
 
 type sendMessageOptions struct {
@@ -65,6 +69,21 @@ type sendMessageOptions struct {
 
 func (c *GmailSendCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
+	correlationID, err := validateGmailCorrelationID(c.CorrelationID)
+	if err != nil {
+		return err
+	}
+	if correlationID != "" {
+		if _, err = requireExplicitGmailAccount(flags); err != nil {
+			return err
+		}
+		if err = validateOpaqueReplyTo(c.ReplyTo); err != nil {
+			return err
+		}
+		if c.TrackSplit {
+			return usage("--correlation-id cannot be combined with --track-split")
+		}
+	}
 
 	replyToMessageID := normalizeGmailMessageID(c.ReplyToMessageID)
 	threadID := normalizeGmailThreadID(c.ThreadID)
@@ -126,6 +145,7 @@ func (c *GmailSendCmd) Run(ctx context.Context, flags *RootFlags) error {
 		"thread_id":           threadID,
 		"reply_all":           c.ReplyAll,
 		"reply_to":            strings.TrimSpace(c.ReplyTo),
+		"correlation_id":      correlationID,
 		"from":                strings.TrimSpace(c.From),
 		"body_len":            len(strings.TrimSpace(body)),
 		"body_html_len":       len(strings.TrimSpace(htmlBodyInput)),
@@ -142,6 +162,19 @@ func (c *GmailSendCmd) Run(ctx context.Context, flags *RootFlags) error {
 	account, svc, err := requireGmailSendService(ctx, flags)
 	if err != nil {
 		return err
+	}
+	if correlationID != "" {
+		existing, _, lookupErr := lookupSentGmailCorrelation(ctx, svc, correlationID)
+		if lookupErr != nil {
+			return fmt.Errorf("preflight correlation lookup failed before send: %w", lookupErr)
+		}
+		switch len(existing) {
+		case 0:
+		case 1:
+			return usagef("correlation ID already exists as provider message %q; use lookup-correlation instead of retrying send", existing[0].MessageID)
+		default:
+			return usagef("correlation ID is ambiguous across %d provider messages; refusing send", len(existing))
+		}
 	}
 
 	from, err := resolveComposeSender(ctx, svc, account, c.From)
@@ -203,6 +236,10 @@ func (c *GmailSendCmd) Run(ctx context.Context, flags *RootFlags) error {
 		}
 	}
 
+	headers, err := gmailCorrelationHeaders(correlationID)
+	if err != nil {
+		return err
+	}
 	batches := buildSendBatches(toRecipients, ccRecipients, bccRecipients, c.Track, c.TrackSplit)
 	results, err := sendGmailBatches(ctx, svc, sendMessageOptions{
 		FromAddr:    from.header,
@@ -211,6 +248,7 @@ func (c *GmailSendCmd) Run(ctx context.Context, flags *RootFlags) error {
 		Body:        body,
 		BodyHTML:    htmlBody,
 		ReplyInfo:   replyInfo,
+		Headers:     headers,
 		Attachments: atts,
 		Track:       c.Track,
 		TrackingCfg: trackingCfg,
@@ -352,6 +390,9 @@ func sendGmailBatches(ctx context.Context, svc *gmail.Service, opts sendMessageO
 		if err != nil {
 			return nil, err
 		}
+		if sent == nil || strings.TrimSpace(sent.Id) == "" {
+			return nil, fmt.Errorf("Gmail send returned no provider message ID; outcome uncertain")
+		}
 
 		resultRecipient := strings.TrimSpace(batch.TrackingRecipient)
 		if resultRecipient == "" {
@@ -363,6 +404,21 @@ func sendGmailBatches(ctx context.Context, svc *gmail.Service, opts sendMessageO
 			ThreadID:   sent.ThreadId,
 			TrackingID: trackingID,
 		})
+
+		if correlationID := opts.Headers[gmailCorrelationHeader]; correlationID != "" {
+			verified, verifyErr := verifySentGmailCorrelation(ctx, svc, sent, correlationID, opts.ReplyTo)
+			if verifyErr != nil {
+				return nil, fmt.Errorf(
+					"Gmail accepted message %q but provider-copy verification failed; outcome uncertain, do not retry before lookup-correlation: %w",
+					sent.Id,
+					verifyErr,
+				)
+			}
+			results[len(results)-1].ThreadID = verified.ThreadID
+			results[len(results)-1].RFCMessageID = verified.RFCMessageID
+			results[len(results)-1].CorrelationID = verified.CorrelationID
+			results[len(results)-1].ReplyTo = verified.ReplyTo
+		}
 	}
 
 	return results, nil
@@ -372,12 +428,15 @@ func writeSendResults(ctx context.Context, u *ui.UI, fromAddr string, results []
 	items := make([]gmailMessageResult, 0, len(results))
 	for _, r := range results {
 		items = append(items, gmailMessageResult{
-			From:        fromAddr,
-			To:          r.To,
-			MessageID:   r.MessageID,
-			ThreadID:    r.ThreadID,
-			TrackingID:  r.TrackingID,
-			Attachments: attachments,
+			From:          fromAddr,
+			To:            r.To,
+			MessageID:     r.MessageID,
+			ThreadID:      r.ThreadID,
+			RFCMessageID:  r.RFCMessageID,
+			CorrelationID: r.CorrelationID,
+			ReplyTo:       r.ReplyTo,
+			TrackingID:    r.TrackingID,
+			Attachments:   attachments,
 		})
 	}
 	return writeGmailMessageResults(ctx, u, items)

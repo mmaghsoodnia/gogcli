@@ -1,24 +1,18 @@
-# `gog gmail messages`
+# `gog gmail messages lookup-correlation`
 
 > Generated from `gog schema --json`. Do not edit this page by hand; run `make docs-commands`.
 
-Message operations
+Find sent provider copies by an exact X-Sportnet-Correlation-ID
 
 ## Usage
 
 ```bash
-gog gmail (mail,email) messages (message,msg,msgs) <command>
+gog gmail (mail,email) messages (message,msg,msgs) lookup-correlation <correlationId>
 ```
 
 ## Parent
 
-- [gog gmail](gog-gmail.md)
-
-## Subcommands
-
-- [gog gmail messages lookup-correlation](gog-gmail-messages-lookup-correlation.md) - Find sent provider copies by an exact X-Sportnet-Correlation-ID
-- [gog gmail messages modify](gog-gmail-messages-modify.md) - Modify labels on a single message
-- [gog gmail messages search](gog-gmail-messages-search.md) - Search messages using Gmail query syntax
+- [gog gmail messages](gog-gmail-messages.md)
 
 ## Flags
 
@@ -48,5 +42,5 @@ gog gmail (mail,email) messages (message,msg,msgs) <command>
 
 ## See Also
 
-- [gog gmail](gog-gmail.md)
+- [gog gmail messages](gog-gmail-messages.md)
 - [Command index](README.md)
