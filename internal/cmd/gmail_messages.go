@@ -22,8 +22,9 @@ const (
 )
 
 type GmailMessagesCmd struct {
-	Search GmailMessagesSearchCmd `cmd:"" name:"search" aliases:"find,query,ls,list" group:"Read" help:"Search messages using Gmail query syntax"`
-	Modify GmailMessagesModifyCmd `cmd:"" name:"modify" aliases:"update,edit,set" group:"Organize" help:"Modify labels on a single message"`
+	Search            GmailMessagesSearchCmd            `cmd:"" name:"search" aliases:"find,query,ls,list" group:"Read" help:"Search messages using Gmail query syntax"`
+	LookupCorrelation GmailMessagesLookupCorrelationCmd `cmd:"" name:"lookup-correlation" group:"Read" help:"Find sent provider copies by an exact X-Sportnet-Correlation-ID"`
+	Modify            GmailMessagesModifyCmd            `cmd:"" name:"modify" aliases:"update,edit,set" group:"Organize" help:"Modify labels on a single message"`
 }
 
 type GmailMessagesSearchCmd struct {

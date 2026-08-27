@@ -16,6 +16,7 @@ gog gmail (mail,email) messages (message,msg,msgs) <command>
 
 ## Subcommands
 
+- [gog gmail messages lookup-correlation](gog-gmail-messages-lookup-correlation.md) - Find sent provider copies by an exact X-Sportnet-Correlation-ID
 - [gog gmail messages modify](gog-gmail-messages-modify.md) - Modify labels on a single message
 - [gog gmail messages search](gog-gmail-messages-search.md) - Search messages using Gmail query syntax
 

@@ -415,6 +415,7 @@ Generated from `gog schema --json`.
       - [`gog gmail (mail,email) labels (label) style (color,colour) <labelIdOrName> [flags]`](commands/gog-gmail-labels-style.md) - Change a user label color or visibility
     - [`gog gmail (mail,email) mark-read (read-messages) [<messageId> ...] [flags]`](commands/gog-gmail-mark-read.md) - Mark messages as read
     - [`gog gmail (mail,email) messages (message,msg,msgs) <command>`](commands/gog-gmail-messages.md) - Message operations
+      - [`gog gmail (mail,email) messages (message,msg,msgs) lookup-correlation <correlationId>`](commands/gog-gmail-messages-lookup-correlation.md) - Find sent provider copies by an exact X-Sportnet-Correlation-ID
       - [`gog gmail (mail,email) messages (message,msg,msgs) modify (update,edit,set) <messageId> [flags]`](commands/gog-gmail-messages-modify.md) - Modify labels on a single message
       - [`gog gmail (mail,email) messages (message,msg,msgs) search (find,query,ls,list) <query> ... [flags]`](commands/gog-gmail-messages-search.md) - Search messages using Gmail query syntax
     - [`gog gmail (mail,email) raw <messageId> [flags]`](commands/gog-gmail-raw.md) - Dump raw Gmail API response as JSON (Users.Messages.Get; lossless; for scripting and LLM consumption)

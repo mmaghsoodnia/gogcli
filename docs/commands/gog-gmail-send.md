@@ -29,6 +29,7 @@ gog gmail (mail,email) send [flags]
 | `--cc` | `string` |  | CC recipients (comma-separated) |
 | `--client` | `string` |  | OAuth client name (selects stored credentials + token bucket) |
 | `--color` | `string` | auto | Color output: auto\|always\|never |
+| `--correlation-id` | `string` |  | Opaque X-Sportnet-Correlation-ID; requires an explicit --account and --reply-to |
 | `--disable-commands` | `string` |  | Comma-separated list of disabled commands; dot paths allowed |
 | `-n`<br>`--dry-run`<br>`--dryrun`<br>`--noop`<br>`--preview` | `bool` |  | Do not make changes; print intended actions and exit successfully |
 | `--enable-commands` | `string` |  | Comma-separated list of enabled command prefixes; dot paths allowed (restricts CLI) |
