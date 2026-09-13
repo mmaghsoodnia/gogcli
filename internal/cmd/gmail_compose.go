@@ -24,12 +24,15 @@ type composeFromResult struct {
 }
 
 type gmailMessageResult struct {
-	From        string
-	To          string
-	MessageID   string
-	ThreadID    string
-	TrackingID  string
-	Attachments []mailmime.AttachmentMetadata
+	From          string
+	To            string
+	MessageID     string
+	ThreadID      string
+	RFCMessageID  string
+	CorrelationID string
+	ReplyTo       string
+	TrackingID    string
+	Attachments   []mailmime.AttachmentMetadata
 }
 
 func requireGmailSendService(ctx context.Context, flags *RootFlags) (string, *gmail.Service, error) {
@@ -244,6 +247,15 @@ func writeGmailMessageResults(ctx context.Context, u *ui.UI, results []gmailMess
 		if r.ThreadID != "" {
 			u.Out().Linef("thread_id\t%s", r.ThreadID)
 		}
+		if r.RFCMessageID != "" {
+			u.Out().Linef("rfc_message_id\t%s", r.RFCMessageID)
+		}
+		if r.CorrelationID != "" {
+			u.Out().Linef("correlation_id\t%s", r.CorrelationID)
+		}
+		if r.ReplyTo != "" {
+			u.Out().Linef("reply_to\t%s", r.ReplyTo)
+		}
 		if r.TrackingID != "" {
 			u.Out().Linef("tracking_id\t%s", r.TrackingID)
 		}
@@ -258,6 +270,15 @@ func gmailMessageResultJSON(r gmailMessageResult, includeTo bool) map[string]any
 	}
 	if r.From != "" {
 		item["from"] = r.From
+	}
+	if r.RFCMessageID != "" {
+		item["rfcMessageId"] = r.RFCMessageID
+	}
+	if r.CorrelationID != "" {
+		item["correlationId"] = r.CorrelationID
+	}
+	if r.ReplyTo != "" {
+		item["replyTo"] = r.ReplyTo
 	}
 	if includeTo && r.To != "" {
 		item["to"] = r.To

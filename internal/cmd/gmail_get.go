@@ -3,7 +3,12 @@ package cmd
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
+
+	"google.golang.org/api/googleapi"
 
 	"github.com/steipete/gogcli/internal/gmailcontent"
 	"github.com/steipete/gogcli/internal/outfmt"
@@ -11,6 +16,7 @@ import (
 )
 
 type GmailGetCmd struct {
+	NotFoundResult  bool   `name:"not-found-result" help:"Return typed JSON evidence for an exact missing message; requires explicit account and JSON"`
 	MessageID       string `arg:"" name:"messageId" help:"Message ID"`
 	Format          string `name:"format" help:"Message format: full|metadata|raw" default:"full"`
 	Headers         string `name:"headers" help:"Metadata headers (comma-separated; only for --format=metadata)"`
@@ -29,6 +35,15 @@ func (c *GmailGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 	account, err := requireAccount(flags)
 	if err != nil {
 		return err
+	}
+	if c.NotFoundResult {
+		if !outfmt.IsJSON(ctx) {
+			return usage("--not-found-result requires --json")
+		}
+		account, err = requireExplicitGmailAccount(flags)
+		if err != nil {
+			return err
+		}
 	}
 	messageID := strings.TrimSpace(c.MessageID)
 	messageID = normalizeGmailMessageID(messageID)
@@ -67,7 +82,16 @@ func (c *GmailGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 
 	msg, err := call.Do()
 	if err != nil {
+		var apiErr *googleapi.Error
+		if c.NotFoundResult && errors.As(err, &apiErr) && isExactGmailNotFound(apiErr) {
+			return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{
+				"status": "not_found", "account": account, "messageId": messageID,
+			})
+		}
 		return err
+	}
+	if msg == nil || msg.Id != messageID {
+		return fmt.Errorf("provider returned mismatched message ID")
 	}
 
 	unsubscribe := bestUnsubscribeLink(msg.Payload)
@@ -171,4 +195,31 @@ func (c *GmailGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 	default:
 		return nil
 	}
+}
+
+// Bare/HTML/proxy 404 responses are not authoritative Gmail absence evidence.
+func isExactGmailNotFound(err *googleapi.Error) bool {
+	if err == nil || err.Code != 404 {
+		return false
+	}
+	var envelope struct {
+		Error *struct {
+			Code   int
+			Status string
+			Errors []struct{ Reason string }
+		}
+	}
+	if json.Unmarshal([]byte(err.Body), &envelope) != nil || envelope.Error == nil || envelope.Error.Code != 404 {
+		return false
+	}
+	detail := envelope.Error
+	if detail.Status != "" && detail.Status != "NOT_FOUND" {
+		return false
+	}
+	for _, item := range detail.Errors {
+		if item.Reason != "notFound" {
+			return false
+		}
+	}
+	return detail.Status == "NOT_FOUND" || len(detail.Errors) > 0
 }

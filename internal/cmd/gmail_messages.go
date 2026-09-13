@@ -22,8 +22,9 @@ const (
 )
 
 type GmailMessagesCmd struct {
-	Search GmailMessagesSearchCmd `cmd:"" name:"search" aliases:"find,query,ls,list" group:"Read" help:"Search messages using Gmail query syntax"`
-	Modify GmailMessagesModifyCmd `cmd:"" name:"modify" aliases:"update,edit,set" group:"Organize" help:"Modify labels on a single message"`
+	Search            GmailMessagesSearchCmd            `cmd:"" name:"search" aliases:"find,query,ls,list" group:"Read" help:"Search messages using Gmail query syntax"`
+	LookupCorrelation GmailMessagesLookupCorrelationCmd `cmd:"" name:"lookup-correlation" group:"Read" help:"Find sent provider copies by an exact X-Sportnet-Correlation-ID"`
+	Modify            GmailMessagesModifyCmd            `cmd:"" name:"modify" aliases:"update,edit,set" group:"Organize" help:"Modify labels on a single message"`
 }
 
 type GmailMessagesSearchCmd struct {
@@ -202,6 +203,13 @@ type messageItem struct {
 }
 
 func fetchMessageDetails(ctx context.Context, svc *gmail.Service, messages []*gmail.Message, idToName map[string]string, loc *time.Location, includeBody bool, bodyFormat string) ([]messageItem, error) {
+	seen := map[string]bool{}
+	for _, message := range messages {
+		if message == nil || strings.TrimSpace(message.Id) == "" || seen[message.Id] {
+			return nil, fmt.Errorf("provider search returned malformed or duplicate message ID")
+		}
+		seen[message.Id] = true
+	}
 	preferHTML := bodyFormat == gmailMessageBodyFormatHTML
 	if len(messages) == 0 {
 		return nil, nil
@@ -247,6 +255,11 @@ func fetchMessageDetails(ctx context.Context, svc *gmail.Service, messages []*gm
 			msg, err := call.Context(ctx).Do()
 			if err != nil {
 				results <- result{index: idx, messageID: messageID, err: fmt.Errorf("message %s: %w", messageID, err)}
+				return
+			}
+
+			if msg == nil || msg.Id != messageID {
+				results <- result{index: idx, messageID: messageID, err: fmt.Errorf("provider search returned mismatched message ID")}
 				return
 			}
 

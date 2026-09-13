@@ -2,7 +2,7 @@
 
 Every `gog` command has a generated docs page. The source of truth is the live CLI schema; run `make docs-commands` after changing command names, flags, help text, aliases, or arguments.
 
-Generated pages: 699.
+Generated pages: 700.
 
 ## Top-level Commands
 
@@ -467,6 +467,7 @@ Generated pages: 699.
       - [gog gmail labels style](gog-gmail-labels-style.md) - Change a user label color or visibility
     - [gog gmail mark-read](gog-gmail-mark-read.md) - Mark messages as read
     - [gog gmail messages](gog-gmail-messages.md) - Message operations
+      - [gog gmail messages lookup-correlation](gog-gmail-messages-lookup-correlation.md) - Find sent provider copies by an exact X-Sportnet-Correlation-ID
       - [gog gmail messages modify](gog-gmail-messages-modify.md) - Modify labels on a single message
       - [gog gmail messages search](gog-gmail-messages-search.md) - Search messages using Gmail query syntax
     - [gog gmail raw](gog-gmail-raw.md) - Dump raw Gmail API response as JSON (Users.Messages.Get; lossless; for scripting and LLM consumption)

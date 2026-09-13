@@ -2,6 +2,10 @@
 
 ## 0.31.1 - Unreleased
 
+- Gmail: reject duplicate identity headers, mismatched provider message IDs and pagination cycles; add opt-in typed exact-message 404 evidence without converting other provider failures to absence.
+
+- Gmail: add fail-closed correlated sends with an explicit account, exact opaque `Reply-To` and `X-Sportnet-Correlation-ID`, stable RFC Message-ID, provider-copy verification, duplicate-marker refusal, and exact sent-message reconciliation via `gmail messages lookup-correlation`.
+
 ## 0.31.0 - 2026-06-24
 
 - Gmail: preserve HTML fragments from `--signature-file` instead of escaping their markup, without broadening HTML detection for message display or reply quoting. (#879) — thanks @kesslerio.
