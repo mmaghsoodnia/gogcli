@@ -122,7 +122,7 @@ func gmailCorrelationMessageID(correlationID string) (string, error) {
 
 func gmailCorrelationHeaders(correlationID string) (map[string]string, error) {
 	if correlationID == "" {
-		return nil, nil
+		return map[string]string{}, nil
 	}
 	rfcMessageID, err := gmailCorrelationMessageID(correlationID)
 	if err != nil {

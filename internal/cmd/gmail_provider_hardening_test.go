@@ -53,7 +53,7 @@ func TestGmailProviderCorrelationPaginationHardening(t *testing.T) {
 				if r.URL.Path == "/gmail/v1/users/me/messages" {
 					token := r.URL.Query().Get("pageToken")
 					if token != "" && mode == "failure" {
-						http.Error(w, "provider unavailable", 503)
+						http.Error(w, "provider unavailable", http.StatusServiceUnavailable)
 						return
 					}
 					messages := []map[string]any{}

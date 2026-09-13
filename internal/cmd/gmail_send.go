@@ -70,20 +70,9 @@ type sendMessageOptions struct {
 
 func (c *GmailSendCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
-	correlationID, err := validateGmailCorrelationID(c.CorrelationID)
+	correlationID, err := c.validateCorrelationOptions(flags)
 	if err != nil {
 		return err
-	}
-	if correlationID != "" {
-		if _, err = requireExplicitGmailAccount(flags); err != nil {
-			return err
-		}
-		if err = validateOpaqueReplyTo(c.ReplyTo); err != nil {
-			return err
-		}
-		if c.TrackSplit {
-			return usage("--correlation-id cannot be combined with --track-split")
-		}
 	}
 
 	replyToMessageID := normalizeGmailMessageID(c.ReplyToMessageID)
@@ -394,12 +383,12 @@ func sendGmailBatches(ctx context.Context, svc *gmail.Service, opts sendMessageO
 		sent, err := svc.Users.Messages.Send("me", msg).Context(sendCtx).Do()
 		if err != nil {
 			if opts.Headers[gmailCorrelationHeader] != "" {
-				return nil, fmt.Errorf("Gmail correlated send failed; outcome uncertain, do not retry before lookup-correlation: %w", err)
+				return nil, fmt.Errorf("gmail correlated send failed; outcome uncertain, do not retry before lookup-correlation: %w", err)
 			}
 			return nil, err
 		}
 		if sent == nil || strings.TrimSpace(sent.Id) == "" {
-			return nil, fmt.Errorf("Gmail send returned no provider message ID; outcome uncertain")
+			return nil, fmt.Errorf("gmail send returned no provider message ID; outcome uncertain")
 		}
 
 		resultRecipient := strings.TrimSpace(batch.TrackingRecipient)
@@ -417,7 +406,7 @@ func sendGmailBatches(ctx context.Context, svc *gmail.Service, opts sendMessageO
 			verified, verifyErr := verifySentGmailCorrelation(ctx, svc, sent, correlationID, opts.ReplyTo)
 			if verifyErr != nil {
 				return nil, fmt.Errorf(
-					"Gmail accepted message %q but provider-copy verification failed; outcome uncertain, do not retry before lookup-correlation: %w",
+					"gmail accepted message %q but provider-copy verification failed; outcome uncertain, do not retry before lookup-correlation: %w",
 					sent.Id,
 					verifyErr,
 				)
@@ -472,4 +461,24 @@ func injectTrackingPixelHTML(htmlBody, pixelHTML string) string {
 		return htmlBody[:i] + pixelHTML + htmlBody[i:]
 	}
 	return htmlBody + pixelHTML
+}
+
+func (c *GmailSendCmd) validateCorrelationOptions(flags *RootFlags) (string, error) {
+	correlationID, err := validateGmailCorrelationID(c.CorrelationID)
+	if err != nil {
+		return "", err
+	}
+	if correlationID == "" {
+		return "", nil
+	}
+	if _, err = requireExplicitGmailAccount(flags); err != nil {
+		return "", err
+	}
+	if err = validateOpaqueReplyTo(c.ReplyTo); err != nil {
+		return "", err
+	}
+	if c.TrackSplit {
+		return "", usage("--correlation-id cannot be combined with --track-split")
+	}
+	return correlationID, nil
 }
