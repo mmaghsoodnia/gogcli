@@ -99,6 +99,9 @@ func validateOpaqueReplyTo(value string) error {
 }
 
 func requireExplicitGmailAccount(flags *RootFlags) (string, error) {
+	if isADCAuthMode(flags) || hasDirectAccessToken(flags) {
+		return "", usage("provider operations require account-bound stored credentials; ADC and direct access tokens are forbidden")
+	}
 	if flags == nil || flagAccount(flags) == "" || shouldAutoSelectAccount(flagAccount(flags)) {
 		return "", usage("this provider operation requires an explicit --account; defaults and auto-selection are forbidden")
 	}
@@ -148,7 +151,7 @@ func verifySentGmailCorrelation(ctx context.Context, svc *gmail.Service, sent *g
 	if err != nil {
 		return gmailCorrelationMatch{}, err
 	}
-	match, err := verifiedGmailCorrelationMatch(msg, correlationID, expectedRFCMessageID)
+	match, err := verifiedGmailCorrelationMatch(msg, sent.Id, correlationID, expectedRFCMessageID)
 	if err != nil {
 		return gmailCorrelationMatch{}, err
 	}
@@ -167,22 +170,16 @@ func lookupSentGmailCorrelation(ctx context.Context, svc *gmail.Service, correla
 		return nil, "", err
 	}
 	query := "in:sent rfc822msgid:" + strings.Trim(expectedRFCMessageID, "<>")
-	var summaries []*gmail.Message
-	pageToken := ""
-	for {
-		call := svc.Users.Messages.List("me").Q(query).MaxResults(100).Fields("messages(id,threadId),nextPageToken")
-		if pageToken != "" {
-			call = call.PageToken(pageToken)
-		}
-		page, callErr := call.Context(ctx).Do()
+	summaries, err := collectAllPages("", func(pageToken string) ([]*gmail.Message, string, error) {
+		page, callErr := svc.Users.Messages.List("me").Q(query).MaxResults(100).
+			PageToken(pageToken).Fields("messages(id,threadId),nextPageToken").Context(ctx).Do()
 		if callErr != nil {
 			return nil, "", callErr
 		}
-		summaries = append(summaries, page.Messages...)
-		pageToken = page.NextPageToken
-		if pageToken == "" {
-			break
-		}
+		return page.Messages, page.NextPageToken, nil
+	})
+	if err != nil {
+		return nil, "", err
 	}
 
 	matches := make([]gmailCorrelationMatch, 0, len(summaries))
@@ -204,7 +201,7 @@ func lookupSentGmailCorrelation(ctx context.Context, svc *gmail.Service, correla
 		if getErr != nil {
 			return nil, "", getErr
 		}
-		match, verifyErr := verifiedGmailCorrelationMatch(msg, correlationID, expectedRFCMessageID)
+		match, verifyErr := verifiedGmailCorrelationMatch(msg, summary.Id, correlationID, expectedRFCMessageID)
 		if verifyErr != nil {
 			return nil, "", verifyErr
 		}
@@ -216,15 +213,28 @@ func lookupSentGmailCorrelation(ctx context.Context, svc *gmail.Service, correla
 	return matches, expectedRFCMessageID, nil
 }
 
-func verifiedGmailCorrelationMatch(msg *gmail.Message, correlationID, expectedRFCMessageID string) (gmailCorrelationMatch, error) {
-	if msg == nil || strings.TrimSpace(msg.Id) == "" {
-		return gmailCorrelationMatch{}, fmt.Errorf("provider returned malformed message metadata")
+func verifiedGmailCorrelationMatch(msg *gmail.Message, requestedID, correlationID, expectedRFCMessageID string) (gmailCorrelationMatch, error) {
+	if msg == nil || msg.Id != requestedID || strings.TrimSpace(msg.Id) == "" {
+		return gmailCorrelationMatch{}, fmt.Errorf("provider returned malformed or mismatched message metadata")
 	}
-	observedCorrelationID := headerValue(msg.Payload, gmailCorrelationHeader)
+	observedCorrelationID, err := uniqueGmailIdentityHeader(msg.Payload, gmailCorrelationHeader)
+	if err != nil {
+		return gmailCorrelationMatch{}, err
+	}
+	observedRFCMessageID, err := uniqueGmailIdentityHeader(msg.Payload, "Message-ID")
+	if err != nil {
+		return gmailCorrelationMatch{}, err
+	}
+	replyTo, err := uniqueGmailIdentityHeader(msg.Payload, "Reply-To")
+	if err != nil {
+		return gmailCorrelationMatch{}, err
+	}
+	if err := validateOpaqueReplyTo(replyTo); err != nil {
+		return gmailCorrelationMatch{}, err
+	}
 	if observedCorrelationID != correlationID {
 		return gmailCorrelationMatch{}, fmt.Errorf("provider correlation mismatch for message %q", msg.Id)
 	}
-	observedRFCMessageID := headerValue(msg.Payload, "Message-ID")
 	if observedRFCMessageID != expectedRFCMessageID {
 		return gmailCorrelationMatch{}, fmt.Errorf("provider RFC Message-ID mismatch for message %q", msg.Id)
 	}
@@ -233,6 +243,24 @@ func verifiedGmailCorrelationMatch(msg *gmail.Message, correlationID, expectedRF
 		ThreadID:      msg.ThreadId,
 		RFCMessageID:  observedRFCMessageID,
 		CorrelationID: observedCorrelationID,
-		ReplyTo:       headerValue(msg.Payload, "Reply-To"),
+		ReplyTo:       replyTo,
 	}, nil
+}
+
+// Identity headers must occur exactly once, including duplicates with equal values.
+func uniqueGmailIdentityHeader(payload *gmail.MessagePart, name string) (string, error) {
+	var value string
+	count := 0
+	if payload != nil {
+		for _, header := range payload.Headers {
+			if header != nil && strings.EqualFold(header.Name, name) {
+				count++
+				value = header.Value
+			}
+		}
+	}
+	if count != 1 || value == "" {
+		return "", fmt.Errorf("provider requires exactly one %s header", name)
+	}
+	return value, nil
 }

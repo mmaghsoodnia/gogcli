@@ -137,6 +137,7 @@ This is a **fork** of `openclaw/gogcli`; we mostly consume upstream and keep a t
 
 - **Remotes:** `origin` → `mmaghsoodnia/gogcli` (your fork — push here); `upstream` → `openclaw/gogcli` (pull only, never push).
 - **`main`:** mirrors `upstream/main` plus only this docs layer (`mhivereadme.md`, `TODO.md`, `AGENTS.md`). Sync with `git fetch upstream && git switch main && git rebase upstream/main && git push origin main`.
+- **Downstream runtime:** `codex/mhive-runtime` is the canonical integration/release target for mhive provider features, initialized from deployed upstream/docs baseline `6a1d113a`. Feature PRs target this branch; production builds an exact reachable commit. Environment PM owns integration. Upstream updates arrive through reviewed merges from main; custom runtime features do not merge back into main.
 - **Off-`main` branches** — run `git branch -a` before assuming something is missing:
   - `mm/drive-upload-replace` — `drive_upload` `replace_file_id` support; a clean commit on current upstream, PR-ready.
   - `mm/old-fork-main` — salvaged legacy fork commits (`--show-anchors`, `webContentLink` on drive upload, the linux-build gitignore, an earlier mhivereadme).
@@ -145,3 +146,11 @@ This is a **fork** of `openclaw/gogcli`; we mostly consume upstream and keep a t
 ## Per-agent Instruction Files
 
 - `AGENTS.md`: Codex-specific repository rules and pointer to this file.
+
+
+## Tickler identity
+
+Team BIG; project mhive-environment
+(`e0d36b9c-c7b5-4317-b8e6-a1d126463152`); scope `mhive-environment/mcp`.
+Runtime provider implementation is tracked under BIG-414, paired with wrapper
+contract BIG-343. Canonical downstream repository: mmaghsoodnia/gogcli.

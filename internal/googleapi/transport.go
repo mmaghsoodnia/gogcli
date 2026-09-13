@@ -43,6 +43,13 @@ func NewRetryTransport(base http.RoundTripper) *RetryTransport {
 	}
 }
 
+type noRetryContextKey struct{}
+
+// WithoutRetries marks an operation whose outcome must be reconciled before retry.
+func WithoutRetries(ctx context.Context) context.Context {
+	return context.WithValue(ctx, noRetryContextKey{}, true)
+}
+
 // RoundTrip implements http.RoundTripper with retry logic.
 func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if t.CircuitBreaker != nil && t.CircuitBreaker.IsOpen() {
@@ -52,6 +59,10 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	replayable, err := ensureReplayableBody(req)
 	if err != nil {
 		return nil, err
+	}
+
+	if disabled, _ := req.Context().Value(noRetryContextKey{}).(bool); disabled {
+		replayable = false
 	}
 
 	var resp *http.Response

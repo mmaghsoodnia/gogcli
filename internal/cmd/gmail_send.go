@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/api/gmail/v1"
 
+	"github.com/steipete/gogcli/internal/googleapi"
 	"github.com/steipete/gogcli/internal/mailmime"
 	"github.com/steipete/gogcli/internal/tracking"
 	"github.com/steipete/gogcli/internal/ui"
@@ -386,8 +387,15 @@ func sendGmailBatches(ctx context.Context, svc *gmail.Service, opts sendMessageO
 			return nil, err
 		}
 
-		sent, err := svc.Users.Messages.Send("me", msg).Context(ctx).Do()
+		sendCtx := ctx
+		if opts.Headers[gmailCorrelationHeader] != "" {
+			sendCtx = googleapi.WithoutRetries(ctx)
+		}
+		sent, err := svc.Users.Messages.Send("me", msg).Context(sendCtx).Do()
 		if err != nil {
+			if opts.Headers[gmailCorrelationHeader] != "" {
+				return nil, fmt.Errorf("Gmail correlated send failed; outcome uncertain, do not retry before lookup-correlation: %w", err)
+			}
 			return nil, err
 		}
 		if sent == nil || strings.TrimSpace(sent.Id) == "" {

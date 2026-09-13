@@ -71,3 +71,28 @@ on an isolated branch until the gog MCP wrapper and this CLI build are tested
 together against an isolated mock or an explicitly authorized non-delivering
 provider canary. A production Gmail canary, shared service deployment, or
 consumer activation requires separate explicit authorization.
+
+## Reconciliation read hardening
+
+Identity verification requires exactly one Message-ID, X-Sportnet-Correlation-ID
+and Reply-To header, counting names case-insensitively. Repeated headers are
+rejected even if equal. Every fetched provider ID must equal the requested ID.
+Correlation lookup follows all pages and rejects token cycles and duplicate IDs;
+an error on any page or metadata read fails the entire lookup.
+
+For exact absence evidence use
+`gog --account advocate@sportnet.ai --json gmail get ID --not-found-result`.
+Only a Google API 404 from that message GET returns
+`{"status":"not_found","account":"advocate@sportnet.ai","messageId":"ID"}`.
+Other errors remain failures; callers must validate both account and ID. The flag
+requires JSON and an explicit account. Without the flag, existing error behavior
+is retained. Search JSON always includes nextPageToken; an empty string denotes
+end-of-results, not a snapshot guarantee.
+
+Correlation preflight detects visible duplicates; it is not provider-enforced
+idempotency. Concurrent calls and Gmail indexing delays can still produce
+duplicates. A zero-match lookup following an ambiguous send is not proof that
+resending is safe. Serialize sends per correlation and keep uncertain operations
+pending reconciliation. Correlated POSTs disable automatic transport retries;
+ADC and direct access tokens are rejected because they do not bind credentials
+to the requested account.
